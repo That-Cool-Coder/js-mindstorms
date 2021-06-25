@@ -1,19 +1,23 @@
 const robot = {
-    cmPerRotation : 17.6,
-    degreesPerRotation : 1 / 90,
+    rotationsPerCm : 1 / 17.6,
+    rotationsPerDegree : 1 / 90,
     motorSet : motors.largeBC
+}
+
+function waitForEnterButton() {
+    control.waitForEvent(0, 0)
 }
 
 function turn(degrees: number, motorSpeed: number = 50) {
     degrees = (degrees + 180) % 360 - 180;
     if (degrees < 0) {
         robot.motorSet.tank(-motorSpeed,
-            motorSpeed, degrees * robot.degreesPerRotation,
+            motorSpeed, degrees * robot.rotationsPerDegree,
             MoveUnit.Rotations);
     }
     else {
         robot.motorSet.tank(motorSpeed,
-            -motorSpeed, degrees * robot.degreesPerRotation,
+            -motorSpeed, degrees * robot.rotationsPerDegree,
             MoveUnit.Rotations);
     }
 }
@@ -23,7 +27,7 @@ function p_square() {
     const squareSize = 50;
 
     for (let i = 0; i < squareCount * 4; i++) {
-        let rotations = squareSize * robot.cmPerRotation;
+        let rotations = squareSize * robot.rotationsPerCm;
         robot.motorSet.tank(50, 50, rotations, MoveUnit.Rotations);
         turn(-90);
     }
@@ -35,13 +39,13 @@ function p_rectangle() {
     const rectCount = 1;
 
     for (let i = 0; i < rectCount * 2; i++) {
-        let rotations = width * robot.cmPerRotation;
+        let rotations = width * robot.rotationsPerCm;
         robot.motorSet.tank(50, 50, rotations, MoveUnit.Rotations);
         turn(-90);
-        rotations = height * robot.cmPerRotation;
+        rotations = height * robot.rotationsPerCm;
         robot.motorSet.tank(50, 50, rotations, MoveUnit.Rotations);
         turn(-90);
     }
 }
 
-square();
+p_rectangle();
