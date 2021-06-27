@@ -1,11 +1,16 @@
 const robot = {
     rotationsPerCm : 1 / 17.6,
-    rotationsPerDegree : 1 / 90,
-    motorSet : motors.largeBC
+    rotationsPerDegree : 0,
+    wheelbaseWidth : 10,
+    motorSet : motors.largeBC,
 }
 
+// Init here so we can reference robot
+robot.rotationsPerDegree = Math.PI * robot.wheelbaseWidth
+    * robot.rotationsPerCm / 360;
+
 function waitForEnterButton() {
-    control.waitForEvent(0, 0)
+    control.waitForEvent(0, 0);
 }
 
 function turn(degrees: number, motorSpeed: number = 50) {
@@ -48,4 +53,42 @@ function p_rectangle() {
     }
 }
 
-p_rectangle();
+function p_circle() {
+    const radius = 50;
+    const motorSpeed = 100;
+    const clockwise = true;
+
+    const neutralRotations = radius * Math.PI * 2 * robot.rotationsPerCm;
+
+    const innerCircum =
+        (radius - robot.wheelbaseWidth / 2) * Math.PI * 2;
+    const innerRotations = innerCircum * robot.rotationsPerCm;
+    let innerSpeed = motorSpeed * (innerRotations / neutralRotations);
+
+    const outerCircum =
+        (radius + robot.wheelbaseWidth / 2) * Math.PI * 2;
+    const outerRotations = outerCircum * robot.rotationsPerCm;
+    let outerSpeed = motorSpeed * (outerRotations / neutralRotations);
+
+    // Speed is capped to 100
+    // We don't want only one wheel getting capped - 
+    // (as that would mess up the whole thing)
+    // So reduce both to fit
+    if (outerSpeed > 100) {
+        const reduction = 100 / outerSpeed;
+        innerSpeed *= reduction;
+        outerSpeed *= reduction;
+    }
+
+    if (clockwise) {
+        robot.motorSet.tank(outerSpeed, innerSpeed,
+            neutralRotations, MoveUnit.Rotations);
+    }
+    else {
+        robot.motorSet.tank(innerSpeed, outerSpeed,
+            neutralRotations, MoveUnit.Rotations);
+    }
+}
+
+waitForEnterButton();
+p_circle();
