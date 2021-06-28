@@ -1,18 +1,10 @@
 const robot = {
-    rotationsPerCm : 1 / 17.6,
-    rotationsPerDegree : 0,
-    wheelbaseWidth : 10,
-    motorSet : motors.largeBC,
+    rotationsPerCm: 1 / 17.6,
+    rotationsPerDegree: 0.5 / 90,
+    wheelbaseWidth: 13,
+    motorSet: motors.largeBC,
+    colorSensor: sensors.color3
 }
-
-// Init here so we can reference robot
-robot.rotationsPerDegree = Math.PI * robot.wheelbaseWidth
-    * robot.rotationsPerCm / 360;
-
-function waitForEnterButton() {
-    control.waitForEvent(0, 0);
-}
-
 function turn(degrees: number, motorSpeed: number = 50) {
     degrees = (degrees + 180) % 360 - 180;
     if (degrees < 0) {
@@ -54,7 +46,7 @@ function p_rectangle() {
 }
 
 function p_circle() {
-    const radius = 50;
+    const radius = 30;
     const motorSpeed = 100;
     const clockwise = true;
 
@@ -90,5 +82,13 @@ function p_circle() {
     }
 }
 
-waitForEnterButton();
-p_circle();
+function p_sensorTest() {
+    robot.colorSensor.setThreshold(Light.Dark, 10);
+    robot.colorSensor.onLightDetected(LightIntensityMode.Reflected, Light.Dark, () => {
+        robot.motorSet.stop();
+    });
+    robot.motorSet.tank(50, 50, 50, MoveUnit.Rotations);
+}
+
+brick.buttonEnter.pauseUntil(ButtonEvent.Pressed);
+p_sensorTest();
