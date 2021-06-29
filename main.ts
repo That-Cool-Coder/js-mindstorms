@@ -5,6 +5,14 @@ const robot = {
     motorSet: motors.largeBC,
     colorSensor: sensors.color3
 }
+
+const programs:{ [name: string]: Function } = {
+    'square': p_square,
+    'rectangle': p_rectangle,
+    'circle': p_circle,
+    'sensortest': p_sensorTest
+};
+
 function turn(degrees: number, motorSpeed: number = 50) {
     degrees = (degrees + 180) % 360 - 180;
     if (degrees < 0) {
@@ -19,13 +27,65 @@ function turn(degrees: number, motorSpeed: number = 50) {
     }
 }
 
+function tankDrive(distanceCm: number, motorSpeed: number = 50) {
+    robot.motorSet.tank(motorSpeed, motorSpeed,
+        distanceCm * robot.rotationsPerCm, MoveUnit.Rotations);
+}
+
+function playMusic(musicData: string) {
+    /* Structure of musicData
+    musicData is a list of notes seperated by \n
+    each note has three sections which are seperated by ,
+    
+    first section is note name - c, cs, db, d, ds, eb, e, es...
+    second section is octave - in range 0-8
+    third section is duration, in beats
+
+    EG
+    c,3,1\n // play C3 for 1 beat
+    ds,3,2\n // play D-sharp3 for 2 beats
+    */
+
+    const noteNameToNote = {
+        'c': Note.C,
+        'cs': Note.CSharp,
+        'db': Note.CSharp,
+        'd': Note.D,
+        'ds': Note.DSharp,
+        'eb': Note.DSharp,
+        'e': Note.E,
+        'fb': Note.E,
+        'es': Note.F,
+        'f': Note.F,
+        'fs': Note.FSharp,
+        'gb' : Note.FSharp,
+        'g' : Note.G,
+        'gs' : Note.GSharp,
+        'ab' : Note.GSharp,
+        'a' : Note.A,
+        'as' : Note.ASharp,
+        'bb' : Note.ASharp,
+        'b' : Note.B,
+        'bs' : Note.C,
+        'cb' : Note.B
+    }
+
+    let notes = musicData.split('\n');
+    notes.forEach(note => {
+        let noteSections = note.split(',');
+        if (noteSections.length == 3) {
+            Note.C4
+            music.playTone(Note., BeatFraction.Half)
+        }
+    });
+}
+
 function p_square() {
     const squareCount = 1;
     const squareSize = 50;
 
     for (let i = 0; i < squareCount * 4; i++) {
-        let rotations = squareSize * robot.rotationsPerCm;
-        robot.motorSet.tank(50, 50, rotations, MoveUnit.Rotations);
+        tankDrive(squareSize, 50);
         turn(-90);
     }
 }
@@ -36,11 +96,9 @@ function p_rectangle() {
     const rectCount = 1;
 
     for (let i = 0; i < rectCount * 2; i++) {
-        let rotations = width * robot.rotationsPerCm;
-        robot.motorSet.tank(50, 50, rotations, MoveUnit.Rotations);
+        tankDrive(width, 50);
         turn(-90);
-        rotations = height * robot.rotationsPerCm;
-        robot.motorSet.tank(50, 50, rotations, MoveUnit.Rotations);
+        tankDrive(height, 50);
         turn(-90);
     }
 }
@@ -84,11 +142,17 @@ function p_circle() {
 
 function p_sensorTest() {
     robot.colorSensor.setThreshold(Light.Dark, 10);
-    robot.colorSensor.onLightDetected(LightIntensityMode.Reflected, Light.Dark, () => {
-        robot.motorSet.stop();
-    });
-    robot.motorSet.tank(50, 50, 50, MoveUnit.Rotations);
+
+    function createListener() {
+        robot.colorSensor.onLightDetected(LightIntensityMode.Reflected, Light.Dark, () => {
+            tankDrive(-10, 50);
+            turn(-90, 50);
+            createListener();
+            tankDrive(Infinity, 50);
+        });
+    }
+    createListener();
+    tankDrive(Infinity, 50);
 }
 
-brick.buttonEnter.pauseUntil(ButtonEvent.Pressed);
-p_sensorTest();
+programSelector.showPrograms(programs);
