@@ -3,29 +3,29 @@ const robot = {
     rotationsPerDegree: 0.5 / 90,
     wheelbaseWidth: 13,
     motorSet: motors.largeBC,
-    colorSensor: sensors.color3
+    colorSensor: sensors.color3,
+    screenWidthChars: 28,
+    screenHeightChars: 13,
+    screenWidthPx: 200,
+    screenHeightPx: 130
 }
 
 const programs: { [name: string]: Function } = {
+    'quit': brick.exitProgram,
     'square': p_square,
     'rectangle': p_rectangle,
     'circle': p_circle,
     'stay on table': p_stayOnTable,
-    'music' : p_music
+    'waypoints': p_waypoints,
+    'dinosaur game' : p_dino,
+    'music (needs debugging)': p_music
 };
 
 function turn(degrees: number, motorSpeed: number = 50) {
     degrees = (degrees + 180) % 360 - 180;
-    if (degrees < 0) {
-        robot.motorSet.tank(-motorSpeed,
-            motorSpeed, degrees * robot.rotationsPerDegree,
-            MoveUnit.Rotations);
-    }
-    else {
-        robot.motorSet.tank(motorSpeed,
-            -motorSpeed, degrees * robot.rotationsPerDegree,
-            MoveUnit.Rotations);
-    }
+    robot.motorSet.tank(motorSpeed,
+        -motorSpeed, degrees * robot.rotationsPerDegree,
+        MoveUnit.Rotations);
 }
 
 function tankDrive(distanceCm: number, motorSpeed: number = 50) {
@@ -151,18 +151,33 @@ function p_circle() {
 }
 
 function p_stayOnTable() {
-    robot.colorSensor.setThreshold(Light.Dark, 10);
+    const maxBounces = 3;
 
-    function createListener() {
-        robot.colorSensor.onLightDetected(LightIntensityMode.Reflected, Light.Dark, () => {
-            tankDrive(-10, 50);
-            turn(-90, 50);
-            createListener();
+    brick.showString('Hold the robot over the edge', 1);
+    brick.showString('of the table and press enter', 2);
+    brick.showString('to calibrate the brightness', 3);
+
+    brick.buttonEnter.pauseUntil(ButtonEvent.Pressed);
+    robot.colorSensor.setThreshold(Light.Dark,
+        robot.colorSensor.reflectedLight());
+    
+    brick.clearScreen();
+    brick.showString('Press enter to start driving', 1);
+    brick.buttonEnter.pauseUntil(ButtonEvent.Pressed);
+
+    brick.clearScreen();
+
+    for (let i = 0; i < maxBounces; i ++) {
+        control.runInParallel(function () {
             tankDrive(Infinity, 50);
         });
+        robot.colorSensor.pauseUntilLightDetected(
+            LightIntensityMode.Reflected, Light.Dark);
+        brick.clearScreen();
+        brick.showString(`Bounced ${i + 1} times (max ${maxBounces})`, 1);
+        tankDrive(-10, 50);
+        turn(-90, 50);
     }
-    createListener();
-    tankDrive(Infinity, 50);
 }
 
 function p_music() {
@@ -176,4 +191,127 @@ f,3,1
     playMusic(musicData);
 }
 
-programSelector.showPrograms(programs); 
+function p_waypoints() {
+    function getWaypointPos(): number[] {
+        const increment = 10;
+
+        let x = 0;
+        let y = 0;
+
+        // Clear buffer of buttons to avoid issues
+        brick.buttonLeft.wasPressed();
+        brick.buttonRight.wasPressed();
+        brick.buttonUp.wasPressed();
+        brick.buttonDown.wasPressed();
+        brick.buttonEnter.wasPressed();
+
+
+        while (true) {
+            brick.clearScreen();
+            brick.showString('Use the direction buttons', 1);
+            brick.showString('to select next waypoint pos.', 2);
+            brick.showString('Press enter to drive there.', 3);
+            brick.showString('(To quit, press enter when', 4);
+            brick.showString('  x = 0 and y = 0)', 5);
+            brick.showString(`X: ${x}`, 7);
+            brick.showString(`Y: ${y}`, 8);
+            brick.showString(`Distance: ${xyToDist(x, y)}`, 9);
+            brick.showString(`Heading: ${xyToAngle(x, y)}`, 10);
+
+            pause(50);
+
+            if (brick.buttonLeft.wasPressed()) x -= increment;
+            if (brick.buttonRight.wasPressed()) x += increment;
+            if (brick.buttonDown.wasPressed()) y -= increment;
+            if (brick.buttonUp.wasPressed()) y += increment;
+            if (brick.buttonEnter.wasPressed()) break;
+        }
+
+        return [x, y];
+    }
+
+    function xyToAngle(x: number, y: number): number {
+        x *= -1;
+        let angle = Math.atan2(y, x);
+        let degrees = 180 * angle / Math.PI;
+        degrees -= 90;
+        return degrees;
+    }
+
+    function xyToDist(x: number, y: number): number {
+        return Math.sqrt(x ** 2 + y ** 2);
+    }
+
+    while (true) {
+        let [x, y] = getWaypointPos();
+        if (x == 0 && y == 0) break;
+        let dist = xyToDist(x, y);
+        let angle = xyToAngle(x, y)
+        
+        brick.clearScreen();
+        brick.showString('Driving...', 1);
+
+        turn(angle, 50);
+        tankDrive(dist, 50);
+    }
+}
+
+function p_dino() {
+    const frameRate = 1 / 2;
+
+    const floorY = robot.screenHeightPx - 20;
+
+    const dinoJumpStrength = -200;
+    const gravity = 250;
+    const dinoWidth = 10;
+    const dinoHeight = 20;
+    
+    let dinoX = 10; // relative to left of dino
+    let dinoY = floorY - dinoHeight; // relative to top of dino
+    let dinoVelY = 0;
+
+    let img = image.create(robot.screenWidthPx, robot.screenHeightPx);
+
+    // Define below dino to allow use of vars
+    function draw() {
+
+        img.fillRect(0, 0, robot.screenWidthPx, robot.screenWidthPx, 0);
+
+        // Draw dino
+        img.fillRect(dinoX, dinoY, dinoWidth, dinoHeight, 1);
+
+        // Draw floor
+        img.drawLine(0, floorY, robot.screenWidthPx, floorY, 1);
+
+        brick.showImage(img);
+    }
+
+    // Clear buffer
+    brick.buttonUp.wasPressed();
+
+    let alive = true;
+    while (alive) {
+        let grounded = dinoY + dinoHeight >= floorY;
+
+        if (dinoY + dinoHeight > floorY) {
+            dinoY = floorY - dinoHeight;
+        }
+
+        if (brick.buttonUp.wasPressed() && grounded) {
+            dinoVelY = dinoJumpStrength;
+        }
+
+        if (! grounded) {
+            dinoVelY += gravity * frameRate;
+        }
+
+        dinoY += dinoVelY * frameRate;
+
+        draw();
+        pause(frameRate * 1000);
+    }
+}
+
+while (true) {
+    programSelector.showPrograms(programs);
+}
