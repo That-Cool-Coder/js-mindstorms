@@ -1,7 +1,8 @@
+
 namespace programSelector {
     const heading = 'Select a program to run:';
 
-    let selectedIndex:number = 0;
+    let selectedIndex: number = 0;
     let programs: { [name: string]: Function } = {};
 
     export function showPrograms(i_programs: { [name: string]: Function }) {
@@ -10,16 +11,19 @@ namespace programSelector {
         redraw();
 
         brick.buttonUp.onEvent(ButtonEvent.Pressed, function () {
-            if (selectedIndex > 0) selectedIndex --;
+            selectedIndex --;
+            if (selectedIndex < 0) selectedIndex = Object.keys(programs).length - 1;
             redraw();
         });
         brick.buttonDown.onEvent(ButtonEvent.Pressed, function () {
-            if (selectedIndex < Object.keys(programs).length - 1) selectedIndex ++;
+            selectedIndex ++;
+            if (selectedIndex > Object.keys(programs).length - 1) selectedIndex = 0;
             redraw();
         });
         brick.buttonEnter.onEvent(ButtonEvent.Pressed, function () {
             if (Object.keys(programs).length != 0) {
-                let programName:string = Object.keys(programs)[selectedIndex];
+                let programName: string = Object.keys(programs)[selectedIndex];
+                brick.clearScreen();
                 programs[programName]();
             }
         });

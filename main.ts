@@ -6,11 +6,12 @@ const robot = {
     colorSensor: sensors.color3
 }
 
-const programs:{ [name: string]: Function } = {
+const programs: { [name: string]: Function } = {
     'square': p_square,
     'rectangle': p_rectangle,
     'circle': p_circle,
-    'sensortest': p_sensorTest
+    'stay on table': p_stayOnTable,
+    'music' : p_music
 };
 
 function turn(degrees: number, motorSpeed: number = 50) {
@@ -40,42 +41,51 @@ function playMusic(musicData: string) {
     first section is note name - c, cs, db, d, ds, eb, e, es...
     second section is octave - in range 0-8
     third section is duration, in beats
-
     EG
     c,3,1\n // play C3 for 1 beat
     ds,3,2\n // play D-sharp3 for 2 beats
     */
 
-    const noteNameToNote = {
+    const noteToPitch: { [name: string]: number } = {
+        'r': 0, // rest is no noise
         'c': Note.C,
         'cs': Note.CSharp,
         'db': Note.CSharp,
         'd': Note.D,
-        'ds': Note.DSharp,
-        'eb': Note.DSharp,
+        'ds': Note.Eb,
+        'eb': Note.Eb,
         'e': Note.E,
         'fb': Note.E,
         'es': Note.F,
         'f': Note.F,
         'fs': Note.FSharp,
-        'gb' : Note.FSharp,
-        'g' : Note.G,
-        'gs' : Note.GSharp,
-        'ab' : Note.GSharp,
-        'a' : Note.A,
-        'as' : Note.ASharp,
-        'bb' : Note.ASharp,
-        'b' : Note.B,
-        'bs' : Note.C,
-        'cb' : Note.B
-    }
+        'gb': Note.FSharp,
+        'g': Note.G,
+        'gs': Note.GSharp,
+        'ab': Note.GSharp,
+        'a': Note.A,
+        'as': Note.Bb,
+        'bb': Note.Bb,
+        'b': Note.B,
+        'cb': Note.B,
+        'bs': Note.C
+    };
 
     let notes = musicData.split('\n');
     notes.forEach(note => {
         let noteSections = note.split(',');
         if (noteSections.length == 3) {
-            Note.C4
-            music.playTone(Note., BeatFraction.Half)
+            let noteName = noteSections[0];
+            let noteOctave = parseInt(noteSections[1]);
+            let noteBeats = parseFloat(noteSections[2]);
+            let pitch = noteToPitch[noteName];
+            pitch *= 2 ** (noteOctave - 3);
+
+            music.playTone(pitch, noteBeats);
+
+            // Music is async, so play wait for duration
+            let beatsPerSecond = music.tempo() / 60;
+            pause(noteBeats * beatsPerSecond * 1000);
         }
     });
 }
@@ -140,7 +150,7 @@ function p_circle() {
     }
 }
 
-function p_sensorTest() {
+function p_stayOnTable() {
     robot.colorSensor.setThreshold(Light.Dark, 10);
 
     function createListener() {
@@ -155,4 +165,15 @@ function p_sensorTest() {
     tankDrive(Infinity, 50);
 }
 
-programSelector.showPrograms(programs);
+function p_music() {
+    let musicData = 
+`
+c,3,1
+d,3,1
+e,3,1
+f,3,1
+`;
+    playMusic(musicData);
+}
+
+programSelector.showPrograms(programs); 
