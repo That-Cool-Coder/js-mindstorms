@@ -81,11 +81,7 @@ function playMusic(musicData: string) {
             let pitch = noteToPitch[noteName];
             pitch *= 2 ** (noteOctave - 3);
 
-            music.playTone(pitch, noteBeats);
-
-            // Music is async, so play wait for duration
-            let beatsPerSecond = music.tempo() / 60;
-            pause(noteBeats * beatsPerSecond * 1000);
+            music.playTone(pitch, noteBeats * 1000 / 4);
         }
     });
 }
@@ -183,10 +179,33 @@ function p_stayOnTable() {
 function p_music() {
     let musicData = 
 `
+e,3,1
+d,3,1
 c,3,1
 d,3,1
+`;
+`
 e,3,1
-f,3,1
+e,3,1
+e,3,1
+r,0,1
+
+e,3,1
+d,3,1
+c,3,1
+d,3,1
+
+e,3,1
+e,3,1
+e,3,1
+e,3,1
+
+d,3,1
+d,3,1
+e,3,1
+d,3,1
+
+c,3,4
 `;
     playMusic(musicData);
 }
