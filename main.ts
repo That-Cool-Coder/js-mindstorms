@@ -17,7 +17,7 @@ const programs: { [name: string]: Function } = {
     'circle': p_circle,
     'stay on table': p_stayOnTable,
     'waypoints': p_waypoints,
-    'dinosaur game' : p_dino,
+    'snake' : p_snake,
     'music (needs debugging)': p_music
 };
 
@@ -167,11 +167,12 @@ function p_stayOnTable() {
         control.runInParallel(function () {
             tankDrive(Infinity, 50);
         });
+        robot.motorSet.stop();
         robot.colorSensor.pauseUntilLightDetected(
             LightIntensityMode.Reflected, Light.Dark);
         brick.clearScreen();
         brick.showString(`Bounced ${i + 1} times (max ${maxBounces})`, 1);
-        tankDrive(-10, 50);
+        tankDrive(-1, 50);
         turn(-90, 50);
     }
 }
@@ -276,7 +277,9 @@ function p_waypoints() {
 }
 
 function p_dino() {
-    const frameRate = 1 / 2;
+    // Very laggy, doesn't run well
+
+    const frameRate = 1 / 20;
 
     const floorY = robot.screenHeightPx - 20;
 
@@ -327,6 +330,158 @@ function p_dino() {
         dinoY += dinoVelY * frameRate;
 
         draw();
+        pause(frameRate * 1000);
+    }
+}
+
+function p_snake() {
+    class Segment {
+        x: number;
+        y: number;
+
+        constructor(x: number, y: number) {
+            this.x = x;
+            this.y = y;
+        }
+
+        touches(segment: Segment): boolean {
+            return this.x == segment.x && this.y == segment.y;
+        }
+
+        copy(): Segment {
+            return new Segment(this.x, this.y);
+        }
+    }
+
+    enum Direction {
+        Up,
+        Down,
+        Left,
+        Right
+    }
+
+    const oppositeDirections = {
+        [Direction.Up] : Direction.Down,
+        [Direction.Down] : Direction.Up,
+        [Direction.Left] : Direction.Right,
+        [Direction.Right] : Direction.Left
+    }
+
+    const frameRate = 1 / 10;
+    const gridSize = 20;
+    const pixelSize = Math.floor(Math.min(robot.screenWidthPx, robot.screenHeightPx) / gridSize);
+    const screenSize = gridSize * pixelSize;
+
+    let img = image.create(screenSize, screenSize);
+
+    const startPos = Math.floor(gridSize / 2);
+    let segments: Segment[] = [
+        new Segment(startPos, startPos),
+        new Segment(startPos - 1, startPos),
+        new Segment(startPos - 2, startPos)
+    ];
+
+    let crntDirection: Direction = Direction.Right;
+    let needsToGrow = false;
+
+    // Define below snake
+    function draw() {
+        // Clear screen
+        img.fillRect(0, 0, screenSize, screenSize, 0);
+
+        segments.forEach(segment => {
+            img.fillRect(segment.x * pixelSize, segment.y * pixelSize,
+                pixelSize, pixelSize, 1);
+        });
+
+        brick.showImage(img);
+    }
+
+    function moveSnake() {
+        let newHead = segments[0].copy();
+        switch (crntDirection) {
+            case Direction.Up:
+                newHead.y -= 1;
+                break;
+            case Direction.Down:
+                newHead.y += 1;
+                break;
+            case Direction.Left:
+                newHead.x -= 1;
+                break;
+            case Direction.Right:
+                newHead.x += 1;
+                break;
+        }
+        segments.unshift(newHead);
+        if (! needsToGrow) segments.pop();
+    }
+
+    function checkControls() {
+        let newDirection = crntDirection;
+        if (brick.buttonLeft.wasPressed()) {
+            newDirection = Direction.Left;
+        }
+        else if (brick.buttonRight.wasPressed()) {
+            newDirection = Direction.Right;
+        }
+        else if (brick.buttonUp.wasPressed()) {
+            newDirection = Direction.Up;
+        }
+        else if (brick.buttonDown.wasPressed()) {
+            newDirection = Direction.Down;
+        }
+
+        // Don't allow to turn from left to right directly
+        if (oppositeDirections[crntDirection] != newDirection) {
+            crntDirection = newDirection;
+        }
+    }
+
+    function checkIfAlive(): boolean {
+        let alive = true;
+
+        // Check wall collision
+        // (use for...of to allow break)
+        for (let segment of segments) {
+            if (segment.x < 0 || segment.x > gridSize ||
+                segment.y < 0 || segment.y > gridSize) {
+                alive = false;
+                break;
+            }
+        };
+
+        if (! alive) return false;
+
+        // Check self-collision
+        // (use for...of to allow break)
+        let filledPositions: Segment[] = [];
+        outerloop:
+        for (let segment of segments) {
+            for (let segment2 of filledPositions) {
+                if (segment.touches(segment2)) {
+                    alive = false;
+                    break outerloop;
+                }
+            }
+            filledPositions.push(segment);
+        };
+
+        return alive;
+    }
+
+    // Flush controls
+    brick.buttonLeft.wasPressed();
+    brick.buttonRight.wasPressed();
+    brick.buttonUp.wasPressed();
+    brick.buttonDown.wasPressed();
+
+    let alive = true;
+    while (alive) {
+        checkControls();
+        moveSnake();
+        draw();
+        alive = checkIfAlive();
         pause(frameRate * 1000);
     }
 }
