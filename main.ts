@@ -28,7 +28,7 @@ function turn(degrees: number, motorSpeed: number = 50) {
         MoveUnit.Rotations);
 }
 
-function tankDrive(distanceCm: number, motorSpeed: number = 50) {
+function driveStraight(distanceCm: number, motorSpeed: number = 50) {
     robot.motorSet.tank(motorSpeed, motorSpeed,
         distanceCm * robot.rotationsPerCm, MoveUnit.Rotations);
 }
@@ -91,7 +91,7 @@ function p_square() {
     const squareSize = 50;
 
     for (let i = 0; i < squareCount * 4; i++) {
-        tankDrive(squareSize, 50);
+        driveStraight(squareSize, 50);
         turn(-90);
     }
 }
@@ -102,9 +102,9 @@ function p_rectangle() {
     const rectCount = 1;
 
     for (let i = 0; i < rectCount * 2; i++) {
-        tankDrive(width, 50);
+        driveStraight(width, 50);
         turn(-90);
-        tankDrive(height, 50);
+        driveStraight(height, 50);
         turn(-90);
     }
 }
@@ -147,8 +147,6 @@ function p_circle() {
 }
 
 function p_stayOnTable() {
-    const maxBounces = 3;
-
     brick.showString('Hold the robot over the edge', 1);
     brick.showString('of the table and press enter', 2);
     brick.showString('to calibrate the brightness', 3);
@@ -163,18 +161,14 @@ function p_stayOnTable() {
 
     brick.clearScreen();
 
-    for (let i = 0; i < maxBounces; i ++) {
-        control.runInParallel(function () {
-            tankDrive(Infinity, 50);
-        });
-        robot.motorSet.stop();
-        robot.colorSensor.pauseUntilLightDetected(
-            LightIntensityMode.Reflected, Light.Dark);
-        brick.clearScreen();
-        brick.showString(`Bounced ${i + 1} times (max ${maxBounces})`, 1);
-        tankDrive(-1, 50);
+    function onDetectEdge() {
+        driveStraight(-10, 50);
         turn(-90, 50);
+        robot.motorSet.stop();
     }
+
+    robot.colorSensor.onLightDetected(LightIntensityMode.Reflected, Light.Dark, onDetectEdge);
+    driveStraight(Infinity);
 }
 
 function p_music() {
@@ -272,7 +266,7 @@ function p_waypoints() {
         brick.showString('Driving...', 1);
 
         turn(angle, 50);
-        tankDrive(dist, 50);
+        driveStraight(dist, 50);
     }
 }
 
@@ -335,7 +329,7 @@ function p_dino() {
 }
 
 function p_snake() {
-    class Segment {
+    class Position {
         x: number;
         y: number;
 
@@ -344,12 +338,12 @@ function p_snake() {
             this.y = y;
         }
 
-        touches(segment: Segment): boolean {
-            return this.x == segment.x && this.y == segment.y;
+        touches(position: Position): boolean {
+            return this.x == position.x && this.y == position.y;
         }
 
-        copy(): Segment {
-            return new Segment(this.x, this.y);
+        copy(): Position {
+            return new Position(this.x, this.y);
         }
     }
 
@@ -360,6 +354,7 @@ function p_snake() {
         Right
     }
 
+    
     const oppositeDirections = {
         [Direction.Up] : Direction.Down,
         [Direction.Down] : Direction.Up,
@@ -368,37 +363,47 @@ function p_snake() {
     }
 
     const frameRate = 1 / 10;
-    const gridSize = 20;
+    const gridSize = 12;
     const pixelSize = Math.floor(Math.min(robot.screenWidthPx, robot.screenHeightPx) / gridSize);
     const screenSize = gridSize * pixelSize;
 
-    let img = image.create(screenSize, screenSize);
+    let img = image.create(screenSize + gridSize, screenSize + gridSize);
 
     const startPos = Math.floor(gridSize / 2);
-    let segments: Segment[] = [
-        new Segment(startPos, startPos),
-        new Segment(startPos - 1, startPos),
-        new Segment(startPos - 2, startPos)
+    let segmentPositions: Position[] = [
+        new Position(startPos, startPos),
+        new Position(startPos - 1, startPos),
+        new Position(startPos - 2, startPos)
     ];
+
+    let applePositions: Position[] = [];
 
     let crntDirection: Direction = Direction.Right;
     let needsToGrow = false;
 
-    // Define below snake
+    // Define below snake data to allow use of vars
     function draw() {
         // Clear screen
         img.fillRect(0, 0, screenSize, screenSize, 0);
 
-        segments.forEach(segment => {
-            img.fillRect(segment.x * pixelSize, segment.y * pixelSize,
+        // Draw snake
+        segmentPositions.forEach(position => {
+            img.fillRect(position.x * pixelSize, position.y * pixelSize,
                 pixelSize, pixelSize, 1);
+        });
+
+        // Draw apples
+        applePositions.forEach(position => {
+            img.fillRect(position.x * pixelSize + pixelSize * 0.25,
+                position.y * pixelSize + pixelSize * 0.25,
+                pixelSize / 2, pixelSize / 2, 1);
         });
 
         brick.showImage(img);
     }
 
     function moveSnake() {
-        let newHead = segments[0].copy();
+        let newHead = segmentPositions[0].copy();
         switch (crntDirection) {
             case Direction.Up:
                 newHead.y -= 1;
@@ -413,8 +418,8 @@ function p_snake() {
                 newHead.x += 1;
                 break;
         }
-        segments.unshift(newHead);
-        if (! needsToGrow) segments.pop();
+        segmentPositions.unshift(newHead);
+        if (! needsToGrow) segmentPositions.pop();
     }
 
     function checkControls() {
@@ -443,9 +448,9 @@ function p_snake() {
 
         // Check wall collision
         // (use for...of to allow break)
-        for (let segment of segments) {
-            if (segment.x < 0 || segment.x > gridSize ||
-                segment.y < 0 || segment.y > gridSize) {
+        for (let position of segmentPositions) {
+            if (position.x < 0 || position.x > gridSize ||
+                position.y < 0 || position.y > gridSize) {
                 alive = false;
                 break;
             }
@@ -455,19 +460,36 @@ function p_snake() {
 
         // Check self-collision
         // (use for...of to allow break)
-        let filledPositions: Segment[] = [];
-        outerloop:
-        for (let segment of segments) {
-            for (let segment2 of filledPositions) {
-                if (segment.touches(segment2)) {
+        let filledPositions: Position[] = [];
+        for (let position of segmentPositions) {
+            for (let position2 of filledPositions) {
+                if (position.touches(position2)) {
                     alive = false;
-                    break outerloop;
+                    break;
                 }
             }
-            filledPositions.push(segment);
+            filledPositions.push(position);
         };
 
         return alive;
+    }
+
+    function createApple() {
+        let generatePos = () => Math.floor(Math.random() * gridSize);
+        let newApplePos = new Position(generatePos(), generatePos());
+        applePositions.push(newApplePos);
+    }
+
+    function eatApples() {
+        for (let segmentPosition of segmentPositions) {
+            for (let applePosition of applePositions) {
+                if (segmentPosition.touches(applePosition)) {
+                    needsToGrow = true;
+                    applePositions.splice(applePositions.indexOf(applePosition), 1);
+                    break;
+                }
+            }
+        }
     }
 
     // Flush controls
@@ -479,9 +501,12 @@ function p_snake() {
     let alive = true;
     while (alive) {
         checkControls();
+        if (applePositions.length == 0) createApple();
+        eatApples();
         moveSnake();
         draw();
         alive = checkIfAlive();
+        needsToGrow = false;
         pause(frameRate * 1000);
     }
 }
