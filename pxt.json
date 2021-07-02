@@ -8,7 +8,8 @@
         "main.ts",
         "README.md",
         "selectable.ts",
-        "programSelector.ts"
+        "programSelector.ts",
+        "perlinNoise.ts"
     ],
     "testFiles": [
         "test.ts"

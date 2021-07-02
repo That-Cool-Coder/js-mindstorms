@@ -4,6 +4,7 @@ const robot = {
     wheelbaseWidth: 13,
     motorSet: motors.largeBC,
     colorSensor: sensors.color3,
+    ultrasonicSensor: sensors.ultrasonic1,
     screenWidthChars: 28,
     screenHeightChars: 13,
     screenWidthPx: 200,
@@ -15,7 +16,7 @@ const programs: { [name: string]: Function } = {
     'square': p_square,
     'rectangle': p_rectangle,
     'circle': p_circle,
-    'stay on table': p_stayOnTable,
+    'wander': p_wander,
     'waypoints': p_waypoints,
     'snake' : p_snake,
     'music (needs debugging)': p_music
@@ -146,14 +147,22 @@ function p_circle() {
     }
 }
 
-function p_stayOnTable() {
+function p_wander() {
+    const updatesPerSecond = 1 / 10;
+    const obstacleSlowDist = 30;
+    const obstacleAvoidDist = 10;
+
+    let isCautious = false;
+    let time = 0;
+
+    const maxTurnFactor = 10;
+
     brick.showString('Hold the robot over the edge', 1);
     brick.showString('of the table and press enter', 2);
     brick.showString('to calibrate the brightness', 3);
 
     brick.buttonEnter.pauseUntil(ButtonEvent.Pressed);
-    robot.colorSensor.setThreshold(Light.Dark,
-        robot.colorSensor.reflectedLight());
+    let dark = robot.colorSensor.reflectedLight();
     
     brick.clearScreen();
     brick.showString('Press enter to start driving', 1);
@@ -161,14 +170,55 @@ function p_stayOnTable() {
 
     brick.clearScreen();
 
-    function onDetectEdge() {
+    function avoidObstacle() {
+        robot.motorSet.stop();
         driveStraight(-10, 50);
         turn(-90, 50);
         robot.motorSet.stop();
+        driveStraight(Infinity);
     }
 
-    robot.colorSensor.onLightDetected(LightIntensityMode.Reflected, Light.Dark, onDetectEdge);
-    driveStraight(Infinity);
+    function startTankDriving(lSpeed: number, rSpeed: number) {
+        control.runInParallel(function () {
+            robot.motorSet.tank(lSpeed, rSpeed, Infinity, MoveUnit.Rotations);
+        });
+    }
+
+    while (true) {
+        let turnFactor = (perlinNoise(time, 0, 0) * 2 - 1) * maxTurnFactor;
+        let lSpeed = 50 + turnFactor;
+        let rSpeed = 50 - turnFactor;
+        if (isCautious) {
+            lSpeed /= 2;
+            rSpeed /= 2;
+        }
+        startTankDriving(lSpeed, rSpeed);
+        
+        let light = robot.colorSensor.reflectedLight();
+        let distance = robot.ultrasonicSensor.distance();
+        if (light < dark) {
+            avoidObstacle();
+        }
+        if (distance < obstacleAvoidDist) {
+            avoidObstacle();
+        }
+        if (distance < obstacleSlowDist) {
+            isCautious = true;
+        }
+        else {
+            isCautious = false;
+        }
+        pause(updatesPerSecond * 1000);
+        time += updatesPerSecond;
+    }
+
+    function onObstacleFar() {
+
+    }
+
+    function onObstacleNear() {
+
+    }
 }
 
 function p_music() {
